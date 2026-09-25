@@ -77,7 +77,7 @@ function listFlows(data, kind, query) {
       const reservoir = data.reservoirs.find((x) => x.id === r.reservoirId);
       return Object.assign({}, r, {
         reservoirName: reservoir ? reservoir.name : '',
-        volumeWan: store.round((Number(r.flow) * 86400) / 10000, 3),
+        volumeWan: water.dailyVolumeWan(r.flow),
       });
     })
     .sort((a, b) => (a.date === b.date ? (a.reservoirId < b.reservoirId ? -1 : 1) : a.date < b.date ? 1 : -1));

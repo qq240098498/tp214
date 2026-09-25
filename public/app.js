@@ -298,6 +298,7 @@
     return '<li>水位记录 ' + ((state.levels || []).length) + ' 条</li>'
       + '<li>入库流量 ' + ((state.flows.inflow || []).length) + ' 条</li>'
       + '<li>出库流量 ' + ((state.flows.release || []).length) + ' 条</li>'
+      + '<li>对应水量＝流量(m³/s)×86400 秒÷10000，入库、出库同一口径（按天折万方）</li>'
       + '<li>当天入库、是否超限取接口</li>';
   }
 

@@ -1,6 +1,21 @@
 // 水库的水量与水位的口径都集中在这里
 const store = require('./store');
 
+// 流量单位 m³/s，水量单位 万m³：按每天 86400 秒先折成立方米，再除以 10000 折成万方
+// 入库与出库必须走同一套口径，任何一处都不要单独改成按小时（3600 秒）算
+const SECONDS_PER_DAY = 86400;
+const CUBIC_METERS_PER_WAN = 10000;
+
+// 一天的流量对应的水量（万m³）
+function dailyVolumeWan(flow) {
+  return store.round((Number(flow) * SECONDS_PER_DAY) / CUBIC_METERS_PER_WAN, 3);
+}
+
+// 一段时间的水量（万m³）：时段平均流量 × 天数 × 每天秒数 ÷ 10000
+function periodVolumeWan(meanFlow, days) {
+  return store.round((Number(meanFlow) * days * SECONDS_PER_DAY) / CUBIC_METERS_PER_WAN, 3);
+}
+
 function decimalsOf(settings) {
   const precision = Number(settings.levelPrecision) || 0.01;
   return Math.max(0, String(precision).split('.')[1] ? String(precision).split('.')[1].length : 0);
@@ -95,9 +110,10 @@ function balance(data, reservoirId, fromDate, toDate) {
   const meanInflow = store.round(inflowRows.reduce((s, r) => s + Number(r.flow), 0) / Math.max(1, inflowRows.length), 3);
   const meanRelease = store.round(releaseRows.reduce((s, r) => s + Number(r.flow), 0) / Math.max(1, releaseRows.length), 3);
 
-  const inflowVolume = store.round((meanInflow * days * 86400) / 10000, 3);
-  const releaseVolume = store.round((meanRelease * days * 3600) / 10000, 3);
-  const lossVolume = 0;
+  // 入库、出库同一套口径：时段平均流量 × 天数 × 86400 秒 ÷ 10000
+  const inflowVolume = periodVolumeWan(meanInflow, days);
+  const releaseVolume = periodVolumeWan(meanRelease, days);
+  const lossVolume = store.round(days * Number(settings.lossPerDayWan || 0), 3);
   const startLevel = from.length ? Number(from[0].level) : 0;
   const endLevel = from.length ? Number(from[from.length - 1].level) : 0;
   const startCapacity = curve ? capacityAt(curve, startLevel, settings) : 0;
@@ -137,5 +153,7 @@ module.exports = {
   limitLevelOf,
   levelCheck,
   warningOf,
+  dailyVolumeWan,
+  periodVolumeWan,
   balance,
 };

@@ -77,7 +77,8 @@ function listFlows(data, kind, query) {
       const reservoir = data.reservoirs.find((x) => x.id === r.reservoirId);
       return Object.assign({}, r, {
         reservoirName: reservoir ? reservoir.name : '',
-        volumeWan: store.round((Number(r.flow) * 86400) / 10000, 3),
+        // 一天一条记录：水量 = 流量 × 1 天 × 86400 ÷ 10000，与水量平衡同一口径
+        volumeWan: water.flowVolumeWan(Number(r.flow), 1),
       });
     })
     .sort((a, b) => (a.date === b.date ? (a.reservoirId < b.reservoirId ? -1 : 1) : a.date < b.date ? 1 : -1));

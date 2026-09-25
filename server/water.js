@@ -78,6 +78,15 @@ function warningOf(reservoir, level, inflowFlow, settings) {
   return { level: grade, byLevel: grade, inflowFlow: flow };
 }
 
+// 一天的秒数：入库、出库一律按"天"折算，不允许一边按天一边按小时
+const SECONDS_PER_DAY = 86400;
+
+// 流量（m³/s）按时段天数换算成水量（万m³）：平均流量 × 天数 × 86400 ÷ 10000
+// 入库与出库必须共用这一个口径，两栏数字才能互相比较
+function flowVolumeWan(meanFlow, days) {
+  return store.round((Number(meanFlow) * Number(days) * SECONDS_PER_DAY) / 10000, 3);
+}
+
 // 时段水量平衡：入库水量 - 出库水量 - 损失 = 蓄变
 function balance(data, reservoirId, fromDate, toDate) {
   const settings = data.settings;
@@ -95,14 +104,16 @@ function balance(data, reservoirId, fromDate, toDate) {
   const meanInflow = store.round(inflowRows.reduce((s, r) => s + Number(r.flow), 0) / Math.max(1, inflowRows.length), 3);
   const meanRelease = store.round(releaseRows.reduce((s, r) => s + Number(r.flow), 0) / Math.max(1, releaseRows.length), 3);
 
-  const inflowVolume = store.round((meanInflow * days * 86400) / 10000, 3);
-  const releaseVolume = store.round((meanRelease * days * 3600) / 10000, 3);
-  const lossVolume = 0;
+  // 入库、出库走同一套换算：平均流量 × 天数 × 86400 ÷ 10000
+  const inflowVolume = flowVolumeWan(meanInflow, days);
+  const releaseVolume = flowVolumeWan(meanRelease, days);
+  const lossVolume = store.round(days * Number(settings.lossPerDayWan || 0), 3);
   const startLevel = from.length ? Number(from[0].level) : 0;
   const endLevel = from.length ? Number(from[from.length - 1].level) : 0;
   const startCapacity = curve ? capacityAt(curve, startLevel, settings) : 0;
   const endCapacity = curve ? capacityAt(curve, endLevel, settings) : 0;
   const deltaStorage = store.round(endCapacity - startCapacity, 3);
+  const netVolume = store.round(inflowVolume - releaseVolume, 3);
   const residual = store.round(inflowVolume - releaseVolume - lossVolume - deltaStorage, 3);
   const balanced = Math.abs(residual) < Number(settings.balanceToleranceWan);
   return {
@@ -115,7 +126,10 @@ function balance(data, reservoirId, fromDate, toDate) {
     meanRelease,
     inflowVolume,
     releaseVolume,
+    netVolume,
     lossVolume,
+    secondsPerDay: SECONDS_PER_DAY,
+    lossPerDayWan: Number(settings.lossPerDayWan || 0),
     startLevel,
     endLevel,
     startCapacity,
@@ -138,4 +152,6 @@ module.exports = {
   levelCheck,
   warningOf,
   balance,
+  flowVolumeWan,
+  SECONDS_PER_DAY,
 };
